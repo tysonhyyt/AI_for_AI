@@ -2,21 +2,21 @@ import streamlit as st
 import time
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
+# import matplotlib.pyplot as plt
+# import seaborn as sns
 import io
 import base64
 
 # sns.set_theme(style="whitegrid")
 # ax2 = sns.barplot(x="", y="", data="")
 
-def create_graph():
-    plt.figure(figsize=(2, 2))
-    sns.set_theme(style="whitegrid")
-    ax = sns.barplot(data=df)
-    # ax.set(xlim=(0, 1))
-    plt.xticks(rotation = 90)
-    st.pyplot(plt)
+# def create_graph():
+#     plt.figure(figsize=(2, 2))
+#     sns.set_theme(style="whitegrid")
+#     ax = sns.barplot(data=df)
+#     # ax.set(xlim=(0, 1))
+#     plt.xticks(rotation = 90)
+#     st.pyplot(plt)
 
 def imagedownload(plt, filename):
     s = io.BytesIO()
@@ -61,7 +61,7 @@ if uploader is not None:
     st.write(df.head())
     if len(df.index) > 5:
         st.caption("The input only show the first 5 rows of data")
-    create_graph()
+    # create_graph()
 else:
     st.info('Awaiting for dataset to be uploaded')
 
