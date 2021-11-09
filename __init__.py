@@ -1,115 +1,321 @@
-# App created by Data Professor http://youtube.com/dataprofessor
-# GitHub repo of this app https://github.com/dataprofessor/ml-auto-app
-# Demo of this app https://share.streamlit.io/dataprofessor/ml-auto-app/main/app.py
-
-import streamlit as st
-import pandas as pd
-from lazypredict.Supervised import LazyRegressor
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_squared_error, r2_score
-from sklearn.datasets import load_diabetes, load_boston
 import matplotlib.pyplot as plt
 import seaborn as sns
-import base64
 import io
-#---------------------------------#
-# Page layout
-## Page expands to full width
-st.set_page_config(page_title='The Machine Learning Algorithm Comparison App',
-    layout='wide')
-#---------------------------------#
-# Model building
-def build_model(df):
-    df = df.loc[:100] # FOR TESTING PURPOSE, COMMENT THIS OUT FOR PRODUCTION
-    X = df.iloc[:,:-1] # Using all column except for the last column as X
-    Y = df.iloc[:,-1] # Selecting the last column as Y
+import base64
+import streamlit as st
+import classification as classify
+import regression as reg
+import cluster
+import pandas as pd
+import mail
+import os
 
-    st.markdown('**1.2. Dataset dimension**')
-    st.write('X')
-    st.info(X.shape)
-    st.write('Y')
-    st.info(Y.shape)
+# sns.set_theme(style="whitegrid")
+# ax2 = sns.barplot(x="", y="", data="")
+def plot_graph(model, how):
+    try:
+        if how == "":
+            return classify.plot_model(model)
+        else:
+            return classify.plot_model(model, plot=how)
+    except:
+        return None
 
-    st.markdown('**1.3. Variable details**:')
-    st.write('X variable (first 20 are shown)')
-    st.info(list(X.columns[:20]))
-    st.write('Y variable')
-    st.info(Y.name)
-
-    # Build lazy model
-    X_train, X_test, Y_train, Y_test = train_test_split(X, Y,test_size = split_size,random_state = seed_number)
-    reg = LazyRegressor(verbose=0,ignore_warnings=False, custom_metric=None)
-    models_train,predictions_train = reg.fit(X_train, X_train, Y_train, Y_train)
-    models_test,predictions_test = reg.fit(X_train, X_test, Y_train, Y_test)
-
-    st.subheader('2. Table of Model Performance')
-
-    st.write('Training set')
-    st.write(predictions_train)
-    st.markdown(filedownload(predictions_train,'training.csv'), unsafe_allow_html=True)
-
-    st.write('Test set')
-    st.write(predictions_test)
-    st.markdown(filedownload(predictions_test,'test.csv'), unsafe_allow_html=True)
-
-    st.subheader('3. Plot of Model Performance (Test set)')
+def upload():
+    st.header(uploader.name, ' upload successfully')
+    index = st.checkbox("Include first column as index")
+    if index:
+        df = pd.read_csv(uploader)
+    else:
+        df = pd.read_csv(uploader, index_col=False)
+    st.write(df.head())
+    if len(df.index) > 5:
+        str1 = "There are " + str(len(df.index)) + " rows of data, only the first 5 is shown."
+        st.caption(str1)
+    # create_graph()
 
 
-    with st.markdown('**R-squared**'):
-        # Tall
-        predictions_test["R-Squared"] = [0 if i < 0 else i for i in predictions_test["R-Squared"] ]
-        plt.figure(figsize=(3, 9))
+def run_classification_model(df, data_split, seed, label, id, column):
+    class_model = classify.ClassificationAutoML()
+    columns = []
+    for i in column:
+        if not column[i] and i != '':
+            columns.append(i)
+    st.markdown('<hr>', unsafe_allow_html=True)
+    with st.spinner('The setup is loading...'):
+        results = class_model.classificationAutoML(df, trainSize=data_split, random_seed=seed,
+                                                                  targetName=label,
+                                                                  idColumnName=id, ignoreFeatures=columns)
+    with st.container():
+        st.header("Data Type")
+        st.write(results)
+    data_type = st.selectbox("Is the data type correct?", ["Yes", "No"])
+    proceed = st.checkbox("Proceed", key=1)
+    proceed1 = False
+    categorical, numerical = [], []
+    if proceed and data_type is "No":
+        type = {}
+        for i in column:
+            if column[i]:
+                type[i] = st.selectbox(i, ['Categorical', 'Numerical'])
+        for i in column:
+            if i not in columns:
+                if type[i] is 'Categorical':
+                    categorical.append(i)
+                elif type[i] is 'Numerical':
+                    numerical.append(i)
+        st.write(categorical)
+        st.write(numerical)
+        proceed1 = st.checkbox("Proceed", key=2)
+        if proceed1:
+            with st.spinner('The setup is loading...'):
+                class_model.classificationAutoML(df, trainSize=split_size, random_seed=seed_number,
+                                           categoricalFeatures=categorical,
+                                           numericFeatures=numerical,
+                                           targetName=label,
+                                           idColumnName=id, ignoreFeatures=columns)
+    elif (proceed and data_type is "Yes") or proceed1:
+        st.markdown('<hr>', unsafe_allow_html=True)
+        with st.spinner('The model is under training, it might take few minutes to execute'):
+            best, results = class_model.fitClassificationModel()
+
+        st.header("Comparison")
+        st.write(results)
+        results = results.data
+
+        st.subheader("Accuracy graph")
+        plt.figure(figsize=(6, 2))
         sns.set_theme(style="whitegrid")
-        ax1 = sns.barplot(y=predictions_test.index, x="R-Squared", data=predictions_test)
-        ax1.set(xlim=(0, 1))
-    st.markdown(imagedownload(plt,'plot-r2-tall.pdf'), unsafe_allow_html=True)
-        # Wide
-    plt.figure(figsize=(9, 3))
-    sns.set_theme(style="whitegrid")
-    ax1 = sns.barplot(x=predictions_test.index, y="R-Squared", data=predictions_test)
-    ax1.set(ylim=(0, 1))
-    plt.xticks(rotation=90)
-    st.pyplot(plt)
-    st.markdown(imagedownload(plt,'plot-r2-wide.pdf'), unsafe_allow_html=True)
+        ax = sns.barplot(x=results.index, y='Accuracy', data=results)
+        plt.xticks(rotation=90)
+        st.pyplot(plt)
+        plt.savefig(os.getcwd() + '\\Images\\classi\\Accuracy.png')
+        plt.clf()
 
-    with st.markdown('**RMSE (capped at 50)**'):
-        # Tall
-        predictions_test["RMSE"] = [50 if i > 50 else i for i in predictions_test["RMSE"] ]
-        plt.figure(figsize=(3, 9))
+        st.subheader("AUC graph")
+        plt.figure(figsize=(6, 2))
         sns.set_theme(style="whitegrid")
-        ax2 = sns.barplot(y=predictions_test.index, x="RMSE", data=predictions_test)
-    st.markdown(imagedownload(plt,'plot-rmse-tall.pdf'), unsafe_allow_html=True)
-        # Wide
-    plt.figure(figsize=(9, 3))
-    sns.set_theme(style="whitegrid")
-    ax2 = sns.barplot(x=predictions_test.index, y="RMSE", data=predictions_test)
-    plt.xticks(rotation=90)
-    st.pyplot(plt)
-    st.markdown(imagedownload(plt,'plot-rmse-wide.pdf'), unsafe_allow_html=True)
+        ax = sns.barplot(x=results.index, y='AUC', data=results)
+        plt.xticks(rotation=90)
+        st.pyplot(plt)
+        plt.savefig(os.getcwd() + '\\Images\\classi\\AUC.png')
+        plt.clf()
 
-    with st.markdown('**Calculation time**'):
-        # Tall
-        predictions_test["Time Taken"] = [0 if i < 0 else i for i in predictions_test["Time Taken"] ]
-        plt.figure(figsize=(3, 9))
+        st.subheader("F1 graph")
+        plt.figure(figsize=(6, 2))
         sns.set_theme(style="whitegrid")
-        ax3 = sns.barplot(y=predictions_test.index, x="Time Taken", data=predictions_test)
-    st.markdown(imagedownload(plt,'plot-calculation-time-tall.pdf'), unsafe_allow_html=True)
-        # Wide
-    plt.figure(figsize=(9, 3))
-    sns.set_theme(style="whitegrid")
-    ax3 = sns.barplot(x=predictions_test.index, y="Time Taken", data=predictions_test)
-    plt.xticks(rotation=90)
-    st.pyplot(plt)
-    st.markdown(imagedownload(plt,'plot-calculation-time-wide.pdf'), unsafe_allow_html=True)
+        ax = sns.barplot(x=results.index, y='F1', data=results)
+        plt.xticks(rotation=90)
+        st.pyplot(plt)
+        plt.savefig(os.getcwd() + '\\Images\\classi\\F1.png')
+        plt.clf()
 
-# Download CSV data
-# https://discuss.streamlit.io/t/how-to-download-file-in-streamlit/1806
-def filedownload(df, filename):
-    csv = df.to_csv(index=False)
-    b64 = base64.b64encode(csv.encode()).decode()  # strings <-> bytes conversions
-    href = f'<a href="data:file/csv;base64,{b64}" download={filename}>Download {filename} File</a>'
-    return href
+        st.markdown('<hr>', unsafe_allow_html=True)
+        st.header('The best model is ' + results.Model[0])
+        st.subheader('Best parameter to use')
+        st.code(best)
+        st.subheader('Performance of ' + results.Model[0])
+        plot_graph(best, '')
+        plot_graph(best, 'confusion_matrix')
+        plot_graph(best, 'class_report')
+
+        tuning = st.checkbox("Perform Hyperparameter Tuning?")
+        if tuning:
+            with st.spinner('Tuning might take some time, please be patience'):
+                best = class_model.tune(best)
+            st.subheader('Parameter of tuned model')
+            st.code(best)
+        download = st.button('Download model')
+        if download:
+            class_model.save(best)
+
+
+def run_regression_model(df, data_split, seed, label, id, column):
+    reg_model = reg.RegressionAutoML()
+    columns = []
+    for i in column:
+        if not column[i] and i != '':
+            columns.append(i)
+    st.markdown('<hr>', unsafe_allow_html=True)
+    with st.spinner('The setup is loading...'):
+        results = reg_model.regressionAutoML(df, trainSize=data_split, random_seed=seed, targetName=label,
+                                             idColumnName=id, ignoreFeatures=columns)
+    with st.container():
+        st.header("Data Type")
+        st.write(results)
+    data_type = st.selectbox("Is the data type correct?", ["Yes", "No"])
+    proceed = st.checkbox("Proceed", key=1)
+    proceed1 = False
+    categorical, numerical = [], []
+    if proceed and data_type is "No":
+        type = {}
+        for i in column:
+            if column[i]:
+                type[i] = st.selectbox(i, ['Categorical', 'Numerical'])
+        for i in column:
+            if i not in columns:
+                if type[i] is 'Categorical':
+                    categorical.append(i)
+                elif type[i] is 'Numerical':
+                    numerical.append(i)
+        st.write(categorical)
+        st.write(numerical)
+        proceed1 = st.checkbox("Proceed", key=2)
+        if proceed1:
+            with st.spinner('The setup is loading...'):
+                reg_model.regressionAutoML(df, trainSize=split_size, random_seed=seed_number,
+                                           categoricalFeatures=categorical,
+                                           numericFeatures=numerical,
+                                           targetName=label,
+                                           idColumnName=id, ignoreFeatures=columns)
+    elif (proceed and data_type is "Yes") or proceed1:
+        st.markdown('<hr>', unsafe_allow_html=True)
+        with st.spinner('The model is under training, it might take few minutes to execute'):
+            best, results = reg_model.fitRegressionModels()
+
+        st.header("Comparison")
+        st.write(results)
+        results = results.data
+
+        st.subheader("MAE graph")
+        plt.figure(figsize=(6, 2))
+        sns.set_theme(style="whitegrid")
+        ax = sns.barplot(x=results.index, y='MAE', data=results)
+        plt.xticks(rotation=90)
+        st.pyplot(plt)
+        plt.savefig(os.getcwd() + '\\Images\\reg\\MAE.png')
+        plt.clf()
+
+        st.subheader("MSE graph")
+        plt.figure(figsize=(6, 2))
+        sns.set_theme(style="whitegrid")
+        ax = sns.barplot(x=results.index, y='MSE', data=results)
+        plt.xticks(rotation=90)
+        st.pyplot(plt)
+        plt.savefig(os.getcwd() + '\\Images\\reg\\MSE.png')
+        plt.clf()
+
+        st.subheader("RMSE graph")
+        plt.figure(figsize=(6, 2))
+        sns.set_theme(style="whitegrid")
+        ax = sns.barplot(x=results.index, y='RMSE', data=results)
+        plt.xticks(rotation=90)
+        st.pyplot(plt)
+        plt.savefig(os.getcwd() + '\\Images\\reg\\RMSE.png')
+        plt.clf()
+
+        st.subheader("R2 graph")
+        plt.figure(figsize=(6, 2))
+        sns.set_theme(style="whitegrid")
+        ax = sns.barplot(x=results.index, y='R2', data=results)
+        plt.xticks(rotation=90)
+        st.pyplot(plt)
+        plt.savefig(os.getcwd() + '\\Images\\R2.png')
+        plt.clf()
+
+        st.markdown('<hr>', unsafe_allow_html=True)
+        st.header('The best model is ' + results.Model[0])
+        st.subheader('Best parameter to use')
+        st.code(best)
+        st.subheader('Performance of '+ results.Model[0])
+        plot_graph(best, 'vc')
+        plot_graph(best, 'error')
+        plot_graph(best, 'residuals')
+
+        tuning = st.checkbox("Perform Hyperparameter Tuning?")
+        if tuning:
+            with st.spinner('Tuning might take some time, please be patience'):
+                best = reg_model.tune(best)
+            st.subheader('Parameter of tuned model')
+            st.code(best)
+        download = st.button('Download model')
+        if download:
+            reg_model.save(best)
+
+
+
+
+def run_cluster_model(df, data_split, seed,  id, column):
+    cluster_model = cluster.ClusterAutoML()
+    columns = []
+    for i in column:
+        if not column[i] and i != '':
+            columns.append(i)
+    st.markdown('<hr>', unsafe_allow_html=True)
+    with st.spinner('The setup is loading...'):
+        results = cluster_model.clusterAutoML(df, trainSize=data_split, random_seed=seed,
+                                             idColumnName=id, ignoreFeatures=columns)
+    with st.container():
+        st.header("Data Type")
+        st.write(results)
+    data_type = st.selectbox("Is the data type correct?", ["Yes", "No"])
+    proceed = st.checkbox("Proceed", key=1)
+    proceed1 = False
+    categorical, numerical = [], []
+    if proceed and data_type is "No":
+        type = {}
+        for i in column:
+            if column[i]:
+                type[i] = st.selectbox(i, ['Categorical', 'Numerical'])
+        for i in column:
+            if i not in columns:
+                if type[i] is 'Categorical':
+                    categorical.append(i)
+                elif type[i] is 'Numerical':
+                    numerical.append(i)
+        st.write(categorical)
+        st.write(numerical)
+        proceed1 = st.checkbox("Proceed", key=2)
+        if proceed1:
+            with st.spinner('The setup is loading...'):
+                cluster_model.clusterAutoML(df, trainSize=split_size, random_seed=seed_number,
+                                           categoricalFeatures=categorical,
+                                           numericFeatures=numerical,
+                                           idColumnName=id, ignoreFeatures=columns)
+    elif (proceed and data_type is "Yes") or proceed1:
+        st.markdown('<hr>', unsafe_allow_html=True)
+        with st.spinner('The model is under training, it might take few minutes to execute'):
+            results, result, best = cluster_model.get_models()
+
+        st.header("Comparison")
+        st.write(results)
+
+        st.subheader("Silhouette graph")
+        plt.figure(figsize=(6, 2))
+        sns.set_theme(style="whitegrid")
+        ax = sns.barplot(x=results.index, y='Silhouette', data=results)
+        plt.xticks(rotation=90)
+        st.pyplot(plt)
+        plt.savefig(os.getcwd() + '\\Images\\cluster\\Silhouette.png')
+        plt.clf()
+
+        st.subheader("Calinski-Harabasz graph")
+        plt.figure(figsize=(6, 2))
+        sns.set_theme(style="whitegrid")
+        ax = sns.barplot(x=results.index, y='Calinski-Harabasz', data=results)
+        plt.xticks(rotation=90)
+        st.pyplot(plt)
+        plt.savefig(os.getcwd() + '\\Images\\cluster\\Calinski-Harabasz.png')
+        plt.clf()
+
+        st.subheader("Davies-Bouldin graph")
+        plt.figure(figsize=(6, 2))
+        sns.set_theme(style="whitegrid")
+        ax = sns.barplot(x=results.index, y='Davies-Bouldin', data=results)
+        plt.xticks(rotation=90)
+        st.pyplot(plt)
+        plt.savefig(os.getcwd() + '\\Images\\cluster\\Davies-Bouldin.png')
+        plt.clf()
+
+        st.markdown('<hr>', unsafe_allow_html=True)
+        st.header('The best model is '+results.model[0])
+        st.subheader('Best parameter to use')
+        st.code(best)
+        st.subheader('Performance of '+ results.model[0])
+        plot_graph(best, 'distance')
+        plot_graph(best, 'elbow')
+        plot_graph(best, 'silhouette')
+
 
 def imagedownload(plt, filename):
     s = io.BytesIO()
@@ -119,59 +325,68 @@ def imagedownload(plt, filename):
     href = f'<a href="data:image/png;base64,{b64}" download={filename}>Download {filename} File</a>'
     return href
 
-#---------------------------------#
-st.write("""
-# The Machine Learning Algorithm Comparison App
-In this implementation, the **lazypredict** library is used for building several machine learning models at once.
-Developed by: [Data Professor](http://youtube.com/dataprofessor)
-""")
 
-#---------------------------------#
-# Sidebar - Collects user input features into dataframe
-with st.sidebar.header('1. Upload your CSV data'):
-    uploaded_file = st.sidebar.file_uploader("Upload your input CSV file", type=["csv"])
-    st.sidebar.markdown("""
-[Example CSV input file](https://raw.githubusercontent.com/dataprofessor/data/master/delaney_solubility_with_descriptors.csv)
-""")
+# Main page
+st.title("MSG AutoML")
+st.write("Developed by: Millenium Square Gang")
+# chart = st.line_chart(last_rows)
+# /Main page
 
-# Sidebar - Specify parameter settings
-with st.sidebar.header('2. Set Parameters'):
+def print_table(uploader, index=False):
+    df = pd.read_csv(uploader, index_col=index)
+    st.dataframe(df.head())
+
+# Side bar
+# progress_bar = st.sidebar.progress(0)
+status_text = st.sidebar.empty()
+with st.sidebar.header("1. Upload your CSV data"):
+    uploader = st.sidebar.file_uploader("Upload your input CSV file", help="Upload your dataset file here", type=['csv','xlsx'])
+with st.sidebar.header('2. Choose model'):
+    model_type = st.sidebar.selectbox("Please choose a model to predict", ["Classification", "Regression", "Clustering"])
+with st.sidebar.header('3. Set Parameters'):
     split_size = st.sidebar.slider('Data split ratio (% for Training Set)', 10, 90, 80, 5)
     seed_number = st.sidebar.slider('Set the random seed number', 1, 100, 42, 1)
+with st.sidebar.header("4. Email"):
+    receivers = st.sidebar.text_area('User email(s)*', help='Separate multiple email by coma ( , )')
+    cc = st.sidebar.text_area('CC email(s)', help='Separate multiple email by coma ( , )')
+# /Sidebar
 
+# Dataset
+if uploader is not None and receivers != '':
+    st.header(uploader.name+' preview')
+    df = pd.read_csv(uploader, index_col=False)
+    st.dataframe(df.head())
+    if len(df.index) > 5:
+        str1 = "There are " + str(len(df.index)-1) + " rows of data, only the first 5 is shown."
+        st.caption(str1)
+    label = ''
+    if model_type is not "Clustering":
+        st.subheader("Choose the Label column")
+        label = st.selectbox('Label column', df.columns, index=len(df.columns) - 1)
+    st.subheader("Choose the ID column")
+    ids = df.columns.tolist()
+    ids.insert(0, "--Not Selected--")
+    id = st.selectbox('ID column', ids, index=0)
+    if id == "--Not Selected--":
+        id=''
+    st.subheader("Choose feature")
+    column = {}
+    for i in df.columns:
+        if not (i == id or i == label):
+            column[i] = st.checkbox(i, value=True)
 
-#---------------------------------#
-# Main panel
-
-# Displays the dataset
-st.subheader('1. Dataset')
-
-if uploaded_file is not None:
-    df = pd.read_csv(uploaded_file)
-    st.markdown('**1.1. Glimpse of dataset**')
-    st.write(df)
-    build_model(df)
+    run = st.checkbox("Click to Run")
+    if run:
+        path = os.getcwd() + "\\Images"
+        if model_type is "Classification":
+            run_classification_model(df, split_size/100.0, seed_number, label, id, column)
+            path = path + '\\classi'
+        elif model_type is "Regression":
+            run_regression_model(df, split_size/100.0, seed_number, label, id, column)
+            path = path + '\\reg'
+        elif model_type is "Clustering":
+            run_cluster_model(df, split_size/100.0, seed_number, id, column)
+            path = path + '\\cluster'
+        mail.sendReport(path, model_type, receivers, cc=cc)
 else:
-    st.info('Awaiting for CSV file to be uploaded.')
-    if st.button('Press to use Example Dataset'):
-        # Diabetes dataset
-        #diabetes = load_diabetes()
-        #X = pd.DataFrame(diabetes.data, columns=diabetes.feature_names)
-        #Y = pd.Series(diabetes.target, name='response')
-        #df = pd.concat( [X,Y], axis=1 )
-
-        #st.markdown('The Diabetes dataset is used as the example.')
-        #st.write(df.head(5))
-
-        # Boston housing dataset
-        boston = load_boston()
-        #X = pd.DataFrame(boston.data, columns=boston.feature_names)
-        #Y = pd.Series(boston.target, name='response')
-        X = pd.DataFrame(boston.data, columns=boston.feature_names).loc[:100] # FOR TESTING PURPOSE, COMMENT THIS OUT FOR PRODUCTION
-        Y = pd.Series(boston.target, name='response').loc[:100] # FOR TESTING PURPOSE, COMMENT THIS OUT FOR PRODUCTION
-        df = pd.concat( [X,Y], axis=1 )
-
-        st.markdown('The Boston housing dataset is used as the example.')
-        st.write(df.head(5))
-
-        build_model(df)
+    st.info('Awaiting for dataset to be uploaded or user email')
