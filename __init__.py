@@ -18,6 +18,7 @@ for i in path:
     if not os.path.isdir(i):
         os.makedirs(i)
 
+
 def plot_graph(model, how):
     try:
         if how == "":
@@ -221,14 +222,15 @@ def run_regression_model(df, data_split, seed, label, id, column):
         plt.savefig(os.getcwd() + '\\Images\\R2.png')
         plt.clf()
 
-        st.markdown('<hr>', unsafe_allow_html=True)
-        st.header('The best model is ' + results.Model[0])
-        st.subheader('Best parameter to use')
-        st.code(best)
-        st.subheader('Performance of '+ results.Model[0])
-        plot_graph(best, 'vc')
-        plot_graph(best, 'error')
-        plot_graph(best, 'residuals')
+        with st.container():
+            st.markdown('<hr>', unsafe_allow_html=True)
+            st.header('The best model is ' + results.Model[0])
+            st.subheader('Best parameter to use')
+            st.code(best)
+            st.subheader('Performance of '+ results.Model[0])
+            plot_graph(best, 'vc')
+            plot_graph(best, 'error')
+            plot_graph(best, 'residuals')
 
         tuning = st.checkbox("Perform Hyperparameter Tuning?")
         if tuning:
@@ -323,6 +325,10 @@ def run_cluster_model(df, data_split, seed,  id, column):
         plot_graph(best, 'distance')
         plot_graph(best, 'elbow')
         plot_graph(best, 'silhouette')
+
+        download = st.button('Download model')
+        if download:
+            cluster_model.save(best)
 
 
 def imagedownload(plt, filename):

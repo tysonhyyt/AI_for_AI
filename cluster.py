@@ -78,6 +78,9 @@ class ClusterAutoML:
 
         return df_new, result, models[best]
 
+    def save(self, best):
+        save_model(best, 'clustering_model')
+
     
 
 
