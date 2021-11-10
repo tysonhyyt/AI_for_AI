@@ -12,6 +12,12 @@ import os
 
 # sns.set_theme(style="whitegrid")
 # ax2 = sns.barplot(x="", y="", data="")
+
+path = [os.getcwd()+'\\Images\\classi', os.getcwd()+'\\Images\\reg', os.getcwd()+'\\Images\\classi']
+for i in path:
+    if not os.path.isdir(i):
+        os.makedirs(i)
+
 def plot_graph(model, how):
     try:
         if how == "":
@@ -69,6 +75,7 @@ def run_classification_model(df, data_split, seed, label, id, column):
         proceed1 = st.checkbox("Proceed", key=2)
         if proceed1:
             with st.spinner('The setup is loading...'):
+                st.write(split_size)
                 class_model.classificationAutoML(df, trainSize=split_size, random_seed=seed_number,
                                            categoricalFeatures=categorical,
                                            numericFeatures=numerical,
@@ -128,6 +135,7 @@ def run_classification_model(df, data_split, seed, label, id, column):
         download = st.button('Download model')
         if download:
             class_model.save(best)
+        st.write("check out this [link](https://colab.research.google.com/drive/1EJ_feSoTAnxcbM0wnfzlqGo5Vg6Vf7XI?usp=sharing) on how to implement the downloaded model")
 
 
 def run_regression_model(df, data_split, seed, label, id, column):
@@ -329,6 +337,7 @@ def imagedownload(plt, filename):
 # Main page
 st.title("MSG AutoML")
 st.write("Developed by: Millenium Square Gang")
+
 # chart = st.line_chart(last_rows)
 # /Main page
 
